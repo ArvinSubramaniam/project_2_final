@@ -25,6 +25,7 @@ NUM_CHANNELS = 3 # RGB images
 PIXEL_DEPTH = 255
 NUM_LABELS = 2
 TRAINING_SIZE = 20
+TEST_SIZE = 50
 VALIDATION_SIZE = 5  # Size of the validation set.
 SEED = 66478  # Set to None for random seed.
 BATCH_SIZE = 16 # 64
@@ -81,7 +82,7 @@ def extract_data(filename, num_images):
     data = [img_patches[i][j] for i in range(len(img_patches)) for j in range(len(img_patches[i]))]
 
     return numpy.asarray(data)
-        
+
 # Assign a label to a patch v
 def value_to_class(v):
     foreground_threshold = 0.25 # percentage of pixels > 1 required to assign a foreground label to a patch
@@ -194,6 +195,9 @@ def main(argv=None):  # pylint: disable=unused-argument
     # Extract it into numpy arrays.
     train_data = extract_data(train_data_filename, TRAINING_SIZE)
     train_labels = extract_labels(train_labels_filename, TRAINING_SIZE)
+    
+    test_data_filename = 'test_set_images/'
+    test_data = extract_data(train_data_filename, TEST_SIZE)
 
     num_epochs = NUM_EPOCHS
 
@@ -242,7 +246,10 @@ def main(argv=None):  # pylint: disable=unused-argument
     # The variables below hold all the trainable weights. They are passed an
     # initial value which will be assigned when when we call:
     # {tf.initialize_all_variables().run()}
-    conv1_weights = tf.Variable(
+    
+    
+    
+    conv1_weights =tf.Variable(
         tf.truncated_normal([5, 5, NUM_CHANNELS, 32],  # 5x5 filter, depth 32.
                             stddev=0.1,
                             seed=SEED))
@@ -320,6 +327,15 @@ def main(argv=None):  # pylint: disable=unused-argument
         oimg = make_img_overlay(img, img_prediction)
 
         return oimg
+    
+    def get_prediction_test(filename, image_idx):
+
+        imageid = "satImage_%.3d" % image_idx
+        image_filename = filename + imageid + ".png"
+        img = mpimg.imread(image_filename)
+
+        img_prediction = get_prediction(img)
+        return img_float_to_uint8(img_prediction)
 
     # We will replicate the model structure for the training subgraph, as well
     # as the evaluation subgraphs, while sharing the trainable parameters.
@@ -351,12 +367,12 @@ def main(argv=None):  # pylint: disable=unused-argument
                               strides=[1, 2, 2, 1],
                               padding='SAME')
 
-        # Uncomment these lines to check the size of each layer
-        # print 'data ' + str(data.get_shape())
-        # print 'conv ' + str(conv.get_shape())
-        # print 'relu ' + str(relu.get_shape())
-        # print 'pool ' + str(pool.get_shape())
-        # print 'pool2 ' + str(pool2.get_shape())
+         #Uncomment these lines to check the size of each layer
+        print ('data ' + str(data.get_shape()))
+        print ('conv ' + str(conv.get_shape()))
+        print ('relu ' + str(relu.get_shape()))
+        print ('pool ' + str(pool.get_shape()))
+        print ('pool2 ' + str(pool2.get_shape()))
 
 
         # Reshape the feature map cuboid into a 2D matrix to feed it to the
@@ -458,7 +474,9 @@ def main(argv=None):  # pylint: disable=unused-argument
             print ('Total number of iterations = ' + str(int(num_epochs * train_size / BATCH_SIZE)))
 
             training_indices = range(train_size)
-
+            
+            numpy.random.seed(1)
+            
             for iepoch in range(num_epochs):
 
                 # Permute training indices
@@ -514,7 +532,15 @@ def main(argv=None):  # pylint: disable=unused-argument
             pimg = get_prediction_with_groundtruth(train_data_filename, i)
             Image.fromarray(pimg).save(prediction_training_dir + "prediction_" + str(i) + ".png")
             oimg = get_prediction_with_overlay(train_data_filename, i)
-            oimg.save(prediction_training_dir + "overlay_" + str(i) + ".png")       
+            oimg.save(prediction_training_dir + "overlay_" + str(i) + ".png")  
+            
+        print ("Running prediction on test set")
+        prediction_test_dir = "predictions_testing/"
+        if not os.path.isdir(prediction_test_dir):
+            os.mkdir(prediction_test_dir)
+        for i in range(1, TEST_SIZE+1):
+            pimg = get_prediction_test(test_data_filename, i)
+            Image.fromarray(pimg).save(prediction_test_dir + 'satImage_%.3d' % i + '.png')            
 
 if __name__ == '__main__':
     tf.app.run()
