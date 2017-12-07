@@ -10,8 +10,9 @@ foreground_threshold = 0.25 # percentage of pixels > 1 required to assign a fore
 # assign a label to a patch
 def patch_to_label(patch):
     df = np.mean(patch)
+    #print(sum(sum(patch == 1)))
     if df > foreground_threshold:
-        return 1
+        return 1    #it was 1 but wrong
     else:
         return 0
 
@@ -44,3 +45,4 @@ if __name__ == '__main__':
         print( image_filename)
         image_filenames.append(image_filename)
     masks_to_submission(submission_filename, *image_filenames)
+    

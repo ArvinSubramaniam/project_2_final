@@ -24,14 +24,13 @@ import tensorflow as tf
 NUM_CHANNELS = 3 # RGB images
 PIXEL_DEPTH = 255
 NUM_LABELS = 2
-TRAINING_SIZE = 20
+TRAINING_SIZE = 100
 TEST_SIZE = 50
-VALIDATION_SIZE = 5  # Size of the validation set.
 SEED = 66478  # Set to None for random seed.
 BATCH_SIZE = 16 # 64
-NUM_EPOCHS = 5
+NUM_EPOCHS = 8
 RESTORE_MODEL = False # If True, restore existing model instead of training a new one
-RECORDING_STEP = 1000
+RECORDING_STEP = 100
 
 # Set image patch size in pixels
 # IMG_PATCH_SIZE should be a multiple of 4
@@ -84,7 +83,8 @@ def extract_data(filename, num_images):
     return numpy.asarray(data)
 
 # Assign a label to a patch v
-def value_to_class(v):
+def value_to_class(v):      
+                    #Why .25??
     foreground_threshold = 0.25 # percentage of pixels > 1 required to assign a foreground label to a patch
     df = numpy.sum(v)
     if df > foreground_threshold:
@@ -195,6 +195,7 @@ def main(argv=None):  # pylint: disable=unused-argument
     # Extract it into numpy arrays.
     train_data = extract_data(train_data_filename, TRAINING_SIZE)
     train_labels = extract_labels(train_labels_filename, TRAINING_SIZE)
+    #train_labels.shape = (12500,2)
     
     test_data_filename = 'test_set_images/'
     test_data = extract_data(train_data_filename, TEST_SIZE)
@@ -298,10 +299,9 @@ def main(argv=None):  # pylint: disable=unused-argument
     def get_prediction(img):
         data = numpy.asarray(img_crop(img, IMG_PATCH_SIZE, IMG_PATCH_SIZE))
         data_node = tf.constant(data)
-        output = tf.nn.softmax(model(data_node))
+        output = tf.nn.softmax(model(data_node)) #Data node is the input node
         output_prediction = s.run(output)
         img_prediction = label_to_img(img.shape[0], img.shape[1], IMG_PATCH_SIZE, IMG_PATCH_SIZE, output_prediction)
-
         return img_prediction
 
     # Get a concatenation of the prediction and groundtruth for given input file
@@ -333,8 +333,9 @@ def main(argv=None):  # pylint: disable=unused-argument
         imageid = "satImage_%.3d" % image_idx
         image_filename = filename + imageid + ".png"
         img = mpimg.imread(image_filename)
-
+        
         img_prediction = get_prediction(img)
+        img_prediction = 1*numpy.logical_not(img_prediction) #We use the function provided but label the other way
         return img_float_to_uint8(img_prediction)
 
     # We will replicate the model structure for the training subgraph, as well
@@ -368,11 +369,12 @@ def main(argv=None):  # pylint: disable=unused-argument
                               padding='SAME')
 
          #Uncomment these lines to check the size of each layer
-        print ('data ' + str(data.get_shape()))
-        print ('conv ' + str(conv.get_shape()))
-        print ('relu ' + str(relu.get_shape()))
-        print ('pool ' + str(pool.get_shape()))
-        print ('pool2 ' + str(pool2.get_shape()))
+        if 0:
+            print ('data ' + str(data.get_shape()))
+            print ('conv ' + str(conv.get_shape()))
+            print ('relu ' + str(relu.get_shape()))
+            print ('pool ' + str(pool.get_shape()))
+            print ('pool2 ' + str(pool2.get_shape()))
 
 
         # Reshape the feature map cuboid into a 2D matrix to feed it to the
@@ -408,8 +410,7 @@ def main(argv=None):  # pylint: disable=unused-argument
     # Training computation: logits + cross-entropy loss.
     logits = model(train_data_node, True) # BATCH_SIZE*NUM_LABELS
     # print 'logits = ' + str(logits.get_shape()) + ' train_labels_node = ' + str(train_labels_node.get_shape())
-    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-        logits = logits,labels = train_labels_node))
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = logits,labels = train_labels_node))
     tf.summary.scalar('loss', loss)
 
     all_params_node = [conv1_weights, conv1_biases, conv2_weights, conv2_biases, fc1_weights, fc1_biases, fc2_weights, fc2_biases]
@@ -471,7 +472,7 @@ def main(argv=None):  # pylint: disable=unused-argument
                                                     graph_def=s.graph_def)
             print ('Initialized!')
             # Loop through training steps.
-            print ('Total number of iterations = ' + str(int(num_epochs * train_size / BATCH_SIZE)))
+            print ('Total number of iterations = ' + str(int(num_epochs * train_size / float(BATCH_SIZE))))
 
             training_indices = range(train_size)
             
@@ -482,7 +483,7 @@ def main(argv=None):  # pylint: disable=unused-argument
                 # Permute training indices
                 perm_indices = numpy.random.permutation(training_indices)
 
-                for step in range (int(train_size / BATCH_SIZE)):
+                for step in range (int(train_size / float(BATCH_SIZE))):
 
                     offset = (step * BATCH_SIZE) % (train_size - BATCH_SIZE)
                     batch_indices = perm_indices[offset:(offset + BATCH_SIZE)]
@@ -506,8 +507,8 @@ def main(argv=None):  # pylint: disable=unused-argument
                         summary_writer.flush()
 
                         # print_predictions(predictions, batch_labels)
-
-                        print ('Epoch %.2f' % (float(step) * BATCH_SIZE / train_size))
+                        print ('step: ', step)
+                        print ('Epoch %.2f' % (iepoch + float(step) * BATCH_SIZE / float(train_size)))
                         print ('Minibatch loss: %.3f, learning rate: %.6f' % (l, lr))
                         print ('Minibatch error: %.1f%%' % error_rate(predictions,
                                                                      batch_labels))
@@ -515,6 +516,7 @@ def main(argv=None):  # pylint: disable=unused-argument
                         sys.stdout.flush()
                     else:
                         # Run the graph and fetch some of the nodes.
+
                         _, l, lr, predictions = s.run(
                             [optimizer, loss, learning_rate, train_prediction],
                             feed_dict=feed_dict)
@@ -541,6 +543,9 @@ def main(argv=None):  # pylint: disable=unused-argument
         for i in range(1, TEST_SIZE+1):
             pimg = get_prediction_test(test_data_filename, i)
             Image.fromarray(pimg).save(prediction_test_dir + 'satImage_%.3d' % i + '.png')            
-
+            oimg = get_prediction_with_overlay(test_data_filename, i)
+            oimg.save(prediction_test_dir + "overlay_" + str(i) + ".png")
+            
+        #tf.summary.get_summary_description(data_node)
 if __name__ == '__main__':
     tf.app.run()
