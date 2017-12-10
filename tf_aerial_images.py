@@ -21,14 +21,16 @@ import tensorflow.python.platform
 import numpy
 import tensorflow as tf
 
+from keras_augmented_fun import *
+
 NUM_CHANNELS = 3 # RGB images
 PIXEL_DEPTH = 255
 NUM_LABELS = 2
-TRAINING_SIZE = 100
+TRAINING_SIZE = 10
 TEST_SIZE = 50
-SEED = 66478  # Set to None for random seed.
-BATCH_SIZE = 16 # 64
-NUM_EPOCHS = 8
+SEED = 66467  # Set to None for random seed.
+BATCH_SIZE = 16 # 64 too big
+NUM_EPOCHS = 5
 RESTORE_MODEL = False # If True, restore existing model instead of training a new one
 RECORDING_STEP = 100
 
@@ -57,7 +59,7 @@ def img_crop(im, w, h):
             list_patches.append(im_patch)
     return list_patches
 
-def extract_data(filename, num_images):
+def extract_data(filename, num_images, train = True):
     """Extract the images into a 4D tensor [image index, y, x, channels].
     Values are rescaled from [0, 255] down to [-0.5, 0.5].
     """
@@ -69,14 +71,16 @@ def extract_data(filename, num_images):
             print ('Loading ' + image_filename)
             img = mpimg.imread(image_filename)
             imgs.append(img)
+            if train:
+                imgs.append(keras_augmentation(img, i))
         else:
             print ('File ' + image_filename + ' does not exist')
-
+    
     num_images = len(imgs)
+    imgs = [numpy.asarray(imgs[k]) for k in range(num_images)]
     IMG_WIDTH = imgs[0].shape[0]
     IMG_HEIGHT = imgs[0].shape[1]
     N_PATCHES_PER_IMAGE = (IMG_WIDTH/IMG_PATCH_SIZE)*(IMG_HEIGHT/IMG_PATCH_SIZE)
-
     img_patches = [img_crop(imgs[i], IMG_PATCH_SIZE, IMG_PATCH_SIZE) for i in range(num_images)]
     data = [img_patches[i][j] for i in range(len(img_patches)) for j in range(len(img_patches[i]))]
 
@@ -103,10 +107,13 @@ def extract_labels(filename, num_images):
             print ('Loading ' + image_filename)
             img = mpimg.imread(image_filename)
             gt_imgs.append(img)
+            gt_imgs.append(keras_augmentation(img, i))
         else:
             print ('File ' + image_filename + ' does not exist')
 
     num_images = len(gt_imgs)
+    gt_imgs = [numpy.asarray(gt_imgs[k]) for k in range(num_images)]
+
     gt_patches = [img_crop(gt_imgs[i], IMG_PATCH_SIZE, IMG_PATCH_SIZE) for i in range(num_images)]
     data = numpy.asarray([gt_patches[i][j] for i in range(len(gt_patches)) for j in range(len(gt_patches[i]))])
     labels = numpy.asarray([value_to_class(numpy.mean(data[i])) for i in range(len(data))])
@@ -198,9 +205,10 @@ def main(argv=None):  # pylint: disable=unused-argument
     #train_labels.shape = (12500,2)
     
     test_data_filename = 'test_set_images/'
-    test_data = extract_data(train_data_filename, TEST_SIZE)
+    test_data = extract_data(train_data_filename, TEST_SIZE, train = False)
 
     num_epochs = NUM_EPOCHS
+
 
     c0 = 0
     c1 = 0
@@ -388,8 +396,8 @@ def main(argv=None):  # pylint: disable=unused-argument
         hidden = tf.nn.relu(tf.matmul(reshape, fc1_weights) + fc1_biases)
         # Add a 50% dropout during training only. Dropout also scales
         # activations such that no rescaling is needed at evaluation time.
-        #if train:
-        #    hidden = tf.nn.dropout(hidden, 0.5, seed=SEED)
+        if train:
+            hidden = tf.nn.dropout(hidden, 0.3, seed=SEED)
         out = tf.matmul(hidden, fc2_weights) + fc2_biases
 
         if train == True:
@@ -436,7 +444,7 @@ def main(argv=None):  # pylint: disable=unused-argument
         0.01,                # Base learning rate.
         batch * BATCH_SIZE,  # Current index into the dataset.
         train_size,          # Decay step.
-        0.95,                # Decay rate.
+        0.90,                # Decay rate. changed, default .95
         staircase=True)
     tf.summary.scalar('learning_rate', learning_rate)
     
@@ -476,7 +484,7 @@ def main(argv=None):  # pylint: disable=unused-argument
 
             training_indices = range(train_size)
             
-            numpy.random.seed(1)
+            #numpy.random.seed(1)
             
             for iepoch in range(num_epochs):
 
@@ -525,16 +533,16 @@ def main(argv=None):  # pylint: disable=unused-argument
                 save_path = saver.save(s, FLAGS.train_dir + "/model.ckpt")
                 print("Model saved in file: %s" % save_path)
 
-
-        print ("Running prediction on training set")
-        prediction_training_dir = "predictions_training/"
-        if not os.path.isdir(prediction_training_dir):
-            os.mkdir(prediction_training_dir)
-        for i in range(1, TRAINING_SIZE+1):
-            pimg = get_prediction_with_groundtruth(train_data_filename, i)
-            Image.fromarray(pimg).save(prediction_training_dir + "prediction_" + str(i) + ".png")
-            oimg = get_prediction_with_overlay(train_data_filename, i)
-            oimg.save(prediction_training_dir + "overlay_" + str(i) + ".png")  
+        if 0:
+            print ("Running prediction on training set")
+            prediction_training_dir = "predictions_training/"
+            if not os.path.isdir(prediction_training_dir):
+                os.mkdir(prediction_training_dir)
+            for i in range(1, TRAINING_SIZE+1):
+                pimg = get_prediction_with_groundtruth(train_data_filename, i)
+                Image.fromarray(pimg).save(prediction_training_dir + "prediction_" + str(i) + ".png")
+                oimg = get_prediction_with_overlay(train_data_filename, i)
+                oimg.save(prediction_training_dir + "overlay_" + str(i) + ".png")  
             
         print ("Running prediction on test set")
         prediction_test_dir = "predictions_testing/"
