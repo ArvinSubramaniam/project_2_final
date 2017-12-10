@@ -11,14 +11,17 @@ datagen = ImageDataGenerator(
         horizontal_flip=True,
         fill_mode='nearest')
 
-def keras_augmentation(img,i, augmentation_rate = 2):
+def keras_augmentation(img,i, augmentation_rate = 4):
     x = img_to_array(img)  # this is a Numpy array with shape (3, 150, 150)
-    x = x.reshape((1,) + x.shape)  # this is a Numpy array with shape (1, 3, 150, 150)
+    x = x.reshape((1,400,400,-1))  # this is a Numpy array with shape (1, 3, 150, 150)
+    print('in Keras fun: ', x.shape)
     aug_img = []
     
-    j = 0;
+    j = 1;
     for batch in datagen.flow(x, batch_size=1, seed = i):
         img_new = batch.reshape((400,400,-1))
+        if img_new.shape == (400,400,1):
+            img_new = img_new.reshape(400,400)
         aug_img.append(img_new)
         
         j += 1

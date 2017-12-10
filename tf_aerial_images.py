@@ -26,11 +26,11 @@ from keras_augmented_fun import *
 NUM_CHANNELS = 3 # RGB images
 PIXEL_DEPTH = 255
 NUM_LABELS = 2
-TRAINING_SIZE = 10
+TRAINING_SIZE = 100
 TEST_SIZE = 50
 SEED = 66467  # Set to None for random seed.
 BATCH_SIZE = 16 # 64 too big
-NUM_EPOCHS = 5
+NUM_EPOCHS = 6
 RESTORE_MODEL = False # If True, restore existing model instead of training a new one
 RECORDING_STEP = 100
 
@@ -49,6 +49,7 @@ def img_crop(im, w, h):
     list_patches = []
     imgwidth = im.shape[0]
     imgheight = im.shape[1]
+    print('in crop func: ', im.shape)
     is_2d = len(im.shape) < 3
     for i in range(0,imgheight,h):
         for j in range(0,imgwidth,w):
@@ -72,12 +73,13 @@ def extract_data(filename, num_images, train = True):
             img = mpimg.imread(image_filename)
             imgs.append(img)
             if train:
-                imgs.append(keras_augmentation(img, i))
+                imgs += keras_augmentation(img, i)
         else:
             print ('File ' + image_filename + ' does not exist')
     
     num_images = len(imgs)
     imgs = [numpy.asarray(imgs[k]) for k in range(num_images)]
+    
     IMG_WIDTH = imgs[0].shape[0]
     IMG_HEIGHT = imgs[0].shape[1]
     N_PATCHES_PER_IMAGE = (IMG_WIDTH/IMG_PATCH_SIZE)*(IMG_HEIGHT/IMG_PATCH_SIZE)
@@ -107,7 +109,7 @@ def extract_labels(filename, num_images):
             print ('Loading ' + image_filename)
             img = mpimg.imread(image_filename)
             gt_imgs.append(img)
-            gt_imgs.append(keras_augmentation(img, i))
+            gt_imgs += keras_augmentation(img, i)
         else:
             print ('File ' + image_filename + ' does not exist')
 
@@ -225,12 +227,14 @@ def main(argv=None):  # pylint: disable=unused-argument
     idx1 = [i for i, j in enumerate(train_labels) if j[1] == 1]
     new_indices = idx0[0:min_c] + idx1[0:min_c]
     print (len(new_indices))
-    print (train_data.shape)
+    print ('train_data.shape ', train_data.shape)
+    print ('train_labels.shape ', train_labels.shape)
     train_data = train_data[new_indices,:,:,:]
     train_labels = train_labels[new_indices]
 
 
     train_size = train_labels.shape[0]
+    print('Train size = ', train_size)
 
     c0 = 0
     c1 = 0
