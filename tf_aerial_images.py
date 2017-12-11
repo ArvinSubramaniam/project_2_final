@@ -4,9 +4,6 @@ This simple baseline consits of a CNN with two convolutional+pooling layers with
 
 Credits: Aurelien Lucchi, ETH Zürich
 """
-
-
-
 import gzip
 import os
 import sys
@@ -30,9 +27,16 @@ TRAINING_SIZE = 100
 TEST_SIZE = 50
 SEED = 66467  # Set to None for random seed.
 BATCH_SIZE = 16 # 64 too big
-NUM_EPOCHS = 6
+NUM_EPOCHS = 8
 RESTORE_MODEL = False # If True, restore existing model instead of training a new one
 RECORDING_STEP = 100
+IMAGE_AUGMENTATION = True
+AUGMENTATION_RATE = 3 #number of modified copies to make per image
+
+DROPOUT_FLAG = True #perform dropout during training
+DROPOUT = 0.1
+
+PREDICTIONS_TRAINING = True #Perform prediction on training set, False to speed up things
 
 # Set image patch size in pixels
 # IMG_PATCH_SIZE should be a multiple of 4
@@ -72,8 +76,8 @@ def extract_data(filename, num_images, train = True):
             print ('Loading ' + image_filename)
             img = mpimg.imread(image_filename)
             imgs.append(img)
-            if train:
-                imgs += keras_augmentation(img, i)
+            if train and IMAGE_AUGMENTATION:
+                imgs += keras_augmentation(img, i, AUGMENTATION_RATE)
         else:
             print ('File ' + image_filename + ' does not exist')
     
@@ -109,7 +113,8 @@ def extract_labels(filename, num_images):
             print ('Loading ' + image_filename)
             img = mpimg.imread(image_filename)
             gt_imgs.append(img)
-            gt_imgs += keras_augmentation(img, i)
+            if IMAGE_AUGMENTATION:
+                gt_imgs += keras_augmentation(img, i, AUGMENTATION_RATE)
         else:
             print ('File ' + image_filename + ' does not exist')
 
@@ -263,12 +268,12 @@ def main(argv=None):  # pylint: disable=unused-argument
     
     
     conv1_weights =tf.Variable(
-        tf.truncated_normal([5, 5, NUM_CHANNELS, 32],  # 5x5 filter, depth 32.
+        tf.truncated_normal([8, 8, NUM_CHANNELS, 32],  # 5x5 filter, depth 32.
                             stddev=0.1,
                             seed=SEED))
     conv1_biases = tf.Variable(tf.zeros([32]))
     conv2_weights = tf.Variable(
-        tf.truncated_normal([5, 5, 32, 64],
+        tf.truncated_normal([4, 4, 32, 64],
                             stddev=0.1,
                             seed=SEED))
     conv2_biases = tf.Variable(tf.constant(0.1, shape=[64]))
@@ -400,8 +405,8 @@ def main(argv=None):  # pylint: disable=unused-argument
         hidden = tf.nn.relu(tf.matmul(reshape, fc1_weights) + fc1_biases)
         # Add a 50% dropout during training only. Dropout also scales
         # activations such that no rescaling is needed at evaluation time.
-        if train:
-            hidden = tf.nn.dropout(hidden, 0.3, seed=SEED)
+        if train and DROPOUT_FLAG:
+            hidden = tf.nn.dropout(hidden, DROPOUT, seed=SEED)
         out = tf.matmul(hidden, fc2_weights) + fc2_biases
 
         if train == True:
@@ -445,10 +450,10 @@ def main(argv=None):  # pylint: disable=unused-argument
     batch = tf.Variable(0)
     # Decay once per epoch, using an exponential schedule starting at 0.01.
     learning_rate = tf.train.exponential_decay(
-        0.01,                # Base learning rate.
+        0.015,                # Base learning rate.
         batch * BATCH_SIZE,  # Current index into the dataset.
-        train_size,          # Decay step.
-        0.90,                # Decay rate. changed, default .95
+        train_size/8,          # Decay step.
+        0.95,                # Decay rate. changed, default .95
         staircase=True)
     tf.summary.scalar('learning_rate', learning_rate)
     
@@ -537,7 +542,7 @@ def main(argv=None):  # pylint: disable=unused-argument
                 save_path = saver.save(s, FLAGS.train_dir + "/model.ckpt")
                 print("Model saved in file: %s" % save_path)
 
-        if 0:
+        if PREDICTIONS_TRAINING:
             print ("Running prediction on training set")
             prediction_training_dir = "predictions_training/"
             if not os.path.isdir(prediction_training_dir):
