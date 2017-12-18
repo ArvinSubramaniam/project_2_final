@@ -23,8 +23,7 @@ NUM_CHANNELS = 3 # RGB images
 PIXEL_DEPTH = 255
 NUM_LABELS = 2
 TRAINING_SIZE = 100
-TESTING_SIZE = 6
-BLOCK = 0
+TESTING_SIZE = 50
 SEED = 66478  # Set to None for random seed.
 BATCH_SIZE = 16 # 64
 NUM_EPOCHS = 80
@@ -40,6 +39,8 @@ AUGMENTATION_RATE = 1 #number of modified copies to make per image
 
 DROPOUT_FLAG = True #perform dropout during training
 DROPOUT = 0.1
+
+PROCESSING_UNIT = 'GPU:0'   #Define CPU or GPU usage with this variable as 'CPU:0' or 'GPU:0'
 
 # Set image patch size in pixels
 # IMG_PATCH_SIZE should be a multiple of 4
@@ -343,7 +344,7 @@ def main(argv=None):  # pylint: disable=unused-argument
     # The variables below hold all the trainable weights. They are passed an
     # initial value which will be assigned when when we call:
     # {tf.initialize_all_variables().run()}
-    with tf.device('/device:GPU:0'):
+    with tf.device('/device:' + PROCESSING_UNIT):
     
         conv1_weights = tf.Variable(
             tf.truncated_normal([5, 5, NUM_CHANNELS, 32],  # 5x5 filter, depth 32.
@@ -672,7 +673,7 @@ def main(argv=None):  # pylint: disable=unused-argument
 
         if not os.path.isdir(prediction_test_dir):
             os.mkdir(prediction_test_dir)
-        for i in range(1 + BLOCK * TESTING_SIZE, (BLOCK+1) * TESTING_SIZE +1):
+        for i in range(1,TESTING_SIZE +1):
             print('processing image %d' %i)
             pimg = get_prediction_for_testing_data(testing_data_dir, i, 1)
             Image.fromarray(pimg).save(prediction_test_dir + "prediction_concat_" + str(i) + ".png")
