@@ -3,7 +3,8 @@
 #from tf_aerial_2_layers import *
 import numpy as np
 import matplotlib.pyplot as plt
-from tf_optimize_2layers import *
+#from tf_optimize_2layers import * #This is for non-image-preprocessed optimizer
+from tf_optimize_2layers_with_aug import *
 
 
 def optimize_kernel_and_patch(subset_size, k_fold = 5):
