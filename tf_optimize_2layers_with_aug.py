@@ -601,6 +601,8 @@ def main(t_size,filter_size,strides,num_filters, patch_size, num_epochs, mom = 0
     ref = False #Auxillary boolean for returning error in optimization
     
     # Create a local session to run this computation.
+    config = tf.ConfigProto(intra_op_parallelism_threads=16, inter_op_parallelism_threads=16, use_per_session_threads=True)
+    
     with tf.Session(config = config) as s:
 
 
@@ -611,7 +613,7 @@ def main(t_size,filter_size,strides,num_filters, patch_size, num_epochs, mom = 0
 
         else:
             # Run all the initializers to prepare the trainable parameters.
-            tf.global_variables_initializer().run()
+            tf.initialize_all_variables().run()
 
             # Build the summary operation based on the TF collection of Summaries.
             summary_op = tf.summary.merge_all()
