@@ -18,6 +18,7 @@ from datetime import datetime
 import matplotlib
 import numpy
 import tensorflow as tf
+import time
 
 from tensorflow.python.keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
 
@@ -799,6 +800,6 @@ def main(t_size,filter_size,strides,num_filters):  # pylint: disable=unused-argu
             image_filenames.append(image_filename)
         masks_to_submission(submission_filename, *image_filenames)
         print('mask to submission finished!')
-
+    print("Total time=%s seconds" % (time.time() - start_time))
 if __name__ == '__main__':
     tf.app.run()
